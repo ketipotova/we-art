@@ -119,6 +119,11 @@ st.markdown("""
         display: none;
     }
 
+    /* Hide empty element at the top */
+    .stApp > div:first-child:empty {
+        display: none;
+    }
+
     /* Base theme */
     .stApp {
         background: linear-gradient(150deg, #1a1a2e 0%, #16213e 100%);
@@ -183,12 +188,6 @@ st.markdown("""
         width: 100%;
         transition: all 0.3s ease;
     }
-
-    /* Additional rule to hide any element that might be empty at the top */
-    .stApp > div:first-child:empty {
-        display: none;
-    }
-
 
     /* User info styling */
     .user-info {
@@ -648,6 +647,13 @@ def display_generation_page():
 
 def main():
     """Main application function"""
+    # Check if logout action is triggered
+    if "logout" in st.experimental_get_query_params():
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.experimental_set_query_params()  # Clear the query params after logout
+        st.experimental_rerun()  # Refresh the page after logout
+
     try:
         # Title and subtitle in a cleaner layout
         st.markdown(
@@ -661,14 +667,15 @@ def main():
         # Show user info and logout button if authenticated
         if st.session_state.authenticated:
             st.markdown(
-                f'''
+                f"""
                 <div class="user-info">
                     <span>👤 {st.session_state.username}</span>
-                    <button onclick="window.location.href='?clear_session=1'">🚪 გასვლა</button>
+                    <button onclick="window.location.href='?logout=1'">🚪 გასვლა</button>
                 </div>
-                ''',
+                """,
                 unsafe_allow_html=True
             )
+
             # Handle logout action
             if "clear_session" in st.experimental_get_query_params():
                 for key in list(st.session_state.keys()):
