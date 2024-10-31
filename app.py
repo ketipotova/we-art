@@ -9,7 +9,7 @@ from PIL import Image
 import requests
 import hashlib
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta  # Updated import
 import os
 import logging
 import extra_streamlit_components as stx
@@ -26,7 +26,7 @@ def show_error_message(error, show_retry=True):
     with error_container.container():
         st.error(f"შეცდომა: {str(error)}")
         if show_retry:
-            if st.button("🔄 ხელახლა ცდა", key="retry_button"):
+            if st.button("🔄 ხელახლა ცდა", key="retry_button", type="primary"):
                 st.rerun()
 
 def handle_error(func):
@@ -109,7 +109,8 @@ def save_session(username, api_key):
         'api_key': api_key,
         'timestamp': str(datetime.now())
     }
-    cookie_manager.set('session_data', json.dumps(session_data), expires_at=datetime.now() + datetime.timedelta(days=30))
+    cookie_manager.set('session_data', json.dumps(session_data), 
+                      expires_at=datetime.now() + timedelta(days=30))
 
 @handle_error
 def load_session():
@@ -160,6 +161,8 @@ def init_session_state():
         st.session_state.username = None
     if 'error' not in st.session_state:
         st.session_state.error = None
+    if 'form_submitted' not in st.session_state:
+        st.session_state.form_submitted = False
 
 # Global client variable
 client = None
@@ -325,6 +328,18 @@ st.markdown("""
         transition: all 0.3s ease;
     }
 
+    /* Form submit button styling */
+    .stFormSubmitter > button {
+        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
+        color: #1a1a2e;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        font-weight: bold;
+        width: 100%;
+        transition: all 0.3s ease;
+    }
+
     /* User info styling */
     .user-info {
         position: fixed;
@@ -338,6 +353,11 @@ st.markdown("""
         padding: 0.5rem 1rem !important;
         border-radius: 20px;
         backdrop-filter: blur(10px);
+    }
+
+    .user-info span {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
     }
 
     /* QR container */
@@ -358,6 +378,26 @@ st.markdown("""
         border-radius: 15px;
         margin: 1rem auto;
     }
+
+    /* Download button styling */
+    .download-button {
+        display: inline-block;
+        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
+        color: #1a1a2e;
+        text-decoration: none;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        font-weight: bold;
+        width: 100%;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    
+    .download-button:hover {
+        opacity: 0.9;
+        color: #1a1a2e;
+        text-decoration: none;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -369,12 +409,12 @@ def show_auth_page():
     tab1, tab2 = st.tabs(["შესვლა", "რეგისტრაცია"])
     
     with tab1:
-        with st.form(key="login_form"):
+        with st.form("login_form"):
             login_username = st.text_input("მომხმარებელი", key="login_username")
             login_password = st.text_input("პაროლი", type="password", key="login_password")
-            login_submitted = st.form_submit_button("შესვლა")
+            submit_login = st.form_submit_button("შესვლა")
             
-            if login_submitted:
+            if submit_login:
                 api_key = verify_user(login_username, login_password)
                 if api_key:
                     st.session_state.authenticated = True
@@ -383,28 +423,28 @@ def show_auth_page():
                     st.session_state.page = 'input'
                     st.rerun()
                 else:
-                    show_error_message("არასწორი მომხმარებელი ან პაროლი", show_retry=False)
+                    st.error("არასწორი მომხმარებელი ან პაროლი")
 
     with tab2:
-        with st.form(key="register_form"):
+        with st.form("register_form"):
             new_username = st.text_input("მომხმარებელი", key="register_username")
             new_password = st.text_input("პაროლი", type="password", key="register_password")
             confirm_password = st.text_input("გაიმეორეთ პაროლი", type="password", key="confirm_password")
             api_key = st.text_input("OpenAI API გასაღები", type="password", key="api_key_input")
-            register_submitted = st.form_submit_button("რეგისტრაცია")
+            submit_register = st.form_submit_button("რეგისტრაცია")
             
-            if register_submitted:
+            if submit_register:
                 if new_password != confirm_password:
-                    show_error_message("პაროლები არ ემთხვევა", show_retry=False)
+                    st.error("პაროლები არ ემთხვევა")
                 elif len(new_password) < 6:
-                    show_error_message("პაროლი უნდა შეიცავდეს მინიმუმ 6 სიმბოლოს", show_retry=False)
+                    st.error("პაროლი უნდა შეიცავდეს მინიმუმ 6 სიმბოლოს")
                 elif not api_key.startswith('sk-'):
-                    show_error_message("არასწორი API გასაღები", show_retry=False)
+                    st.error("არასწორი API გასაღები")
                 else:
                     if create_user(new_username, new_password, api_key):
                         st.success("რეგისტრაცია წარმატებით დასრულდა! გთხოვთ შეხვიდეთ სისტემაში.")
                     else:
-                        show_error_message("მომხმარებელი უკვე არსებობს", show_retry=False)
+                        st.error("მომხმარებელი უკვე არსებობს")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -432,7 +472,7 @@ def show_user_header():
     if st.session_state.get('authenticated', False):
         col1, col2 = st.columns([6, 1])
         with col2:
-            if st.button("🚪 გასვლა", key="logout_button"):
+            if st.button("🚪 გასვლა", key="logout_button", type="primary"):
                 clear_session()
                 st.rerun()
         with col1:
@@ -452,6 +492,7 @@ def display_input_page():
     row1_col1, row1_col2, row1_col3, row1_col4 = st.columns(4)
     row2_col1, row2_col2, row2_col3, row2_col4 = st.columns(4)
 
+    # First row inputs
     with row1_col1:
         st.markdown('<div class="feature-container">', unsafe_allow_html=True)
         st.markdown('<p class="feature-label">👤 სახელი</p>', unsafe_allow_html=True)
@@ -476,6 +517,7 @@ def display_input_page():
         hobby = st.selectbox("", list(hobbies[hobby_category].keys()), label_visibility="collapsed", key="hobby_input")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # Second row inputs
     with row2_col1:
         st.markdown('<div class="feature-container">', unsafe_allow_html=True)
         st.markdown('<p class="feature-label">🎨 ფერი</p>', unsafe_allow_html=True)
@@ -500,10 +542,10 @@ def display_input_page():
         filter_effect = st.selectbox("", list(filters.keys()), label_visibility="collapsed", key="filter_input")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Generate button
+    # Generate button section
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("✨ შექმენი სურათი", use_container_width=True, key="generate_button"):
+        if st.button("✨ შექმენი სურათი", type="primary", use_container_width=True, key="generate_button"):
             if not name:
                 show_error_message("გთხოვთ შეიყვანოთ სახელი", show_retry=False)
                 return
@@ -559,8 +601,7 @@ def create_personalized_prompt(user_data):
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system",
-                 "content": "You are an expert at crafting detailed image generation prompts. Focus on creating vivid, specific descriptions that work well with DALL-E 3."},
+                {"role": "system", "content": "You are an expert at crafting detailed image generation prompts. Focus on creating vivid, specific descriptions that work well with DALL-E 3."},
                 {"role": "user", "content": prompt_request}
             ],
             temperature=0.7
@@ -641,16 +682,15 @@ def display_generation_page():
                     """)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                # Download and new image buttons
                 col1, col2 = st.columns(2)
                 with col1:
                     st.markdown(
-                        f'<a href="{image_url}" download="ai_image.png" '
-                        f'target="_blank"><button style="width:100%">📥 გადმოწერა</button></a>',
+                        f'<a href="{image_url}" class="download-button" '
+                        f'download="ai_image.png" target="_blank">📥 გადმოწერა</a>',
                         unsafe_allow_html=True
                     )
                 with col2:
-                    if st.button("🔄 ახალი სურათი", key="new_image_button"):
+                    if st.button("🔄 ახალი სურათი", type="primary", key="new_image"):
                         st.session_state.page = 'input'
                         st.rerun()
 
