@@ -11,7 +11,7 @@ import sqlite3
 from datetime import datetime
 import os
 import logging
-
+import extra_streamlit_components as stx
 
 # Add this function after your imports
 def get_cookie_manager():
