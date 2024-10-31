@@ -295,6 +295,86 @@ filters = {
     "კონტრასტული": "high contrast"
 }
 
+
+
+def display_input_page():
+    """Display the input form page"""
+    st.markdown('<div class="input-container">', unsafe_allow_html=True)
+
+    # Create two rows with four columns each
+    row1_col1, row1_col2, row1_col3, row1_col4 = st.columns(4)
+    row2_col1, row2_col2, row2_col3, row2_col4 = st.columns(4)
+
+    with row1_col1:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">👤 სახელი</p>', unsafe_allow_html=True)
+        name = st.text_input("", placeholder="მაგ: გიორგი", label_visibility="collapsed", key="name_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row1_col2:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎂 ასაკი</p>', unsafe_allow_html=True)
+        age = st.number_input("", min_value=5, max_value=100, value=25, label_visibility="collapsed", key="age_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row1_col3:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎯 კატეგორია</p>', unsafe_allow_html=True)
+        hobby_category = st.selectbox("", list(hobbies.keys()), label_visibility="collapsed", key="category_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row1_col4:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎨 ჰობი</p>', unsafe_allow_html=True)
+        hobby = st.selectbox("", list(hobbies[hobby_category].keys()), label_visibility="collapsed", key="hobby_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col1:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎨 ფერი</p>', unsafe_allow_html=True)
+        color = st.selectbox("", list(colors.keys()), label_visibility="collapsed", key="color_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col2:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🖼️ სტილი</p>', unsafe_allow_html=True)
+        style = st.selectbox("", list(styles.keys()), label_visibility="collapsed", key="style_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col3:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">😊 განწყობა</p>', unsafe_allow_html=True)
+        mood = st.selectbox("", list(moods.keys()), label_visibility="collapsed", key="mood_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col4:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🌈 ფილტრი</p>', unsafe_allow_html=True)
+        filter_effect = st.selectbox("", list(filters.keys()), label_visibility="collapsed", key="filter_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Generate button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("✨ შექმენი სურათი", use_container_width=True):
+            if not name:
+                st.error("გთხოვთ შეიყვანოთ სახელი")
+                return
+
+            st.session_state.user_data = {
+                "name": name,
+                "age": age,
+                "hobby_category": hobby_category,
+                "hobby": hobby,
+                "color": color,
+                "style": style,
+                "mood": mood,
+                "filter": filter_effect
+            }
+            st.session_state.page = 'generate'
+            st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
 # Helper Functions
 def create_qr_code(url):
     """Create a QR code for the given URL"""
