@@ -14,6 +14,14 @@ import os
 import logging
 import extra_streamlit_components as stx
 
+# Must be the very first Streamlit command
+st.set_page_config(
+    page_title="AI სურათების გენერატორი",
+    page_icon="🎨",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,13 +45,6 @@ if 'authentication_status' not in st.session_state:
 # Global client variable
 client = None
 
-# Must be the first Streamlit command
-st.set_page_config(
-    page_title="AI სურათების გენერატორი",
-    page_icon="🎨",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
 
 # Database functions
 def init_db():
