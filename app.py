@@ -12,6 +12,11 @@ from datetime import datetime
 import os
 import logging
 
+
+# Add this function after your imports
+def get_cookie_manager():
+    return stx.CookieManager()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -66,13 +71,46 @@ def verify_user(username, password):
     conn.close()
     
     if result and result[0] == hash_password(password):
-        # Store credentials in session state for persistence
-        st.session_state.stored_credentials = (username, result[1])
-        return result[1]  # Return API key
+        api_key = result[1]
+        save_session(username, api_key)  # Save to cookies
+        return api_key
     return None
-
 # Initialize the database
 init_db()
+
+
+def save_session(username, api_key):
+    """Save session data to cookies"""
+    cookie_manager = get_cookie_manager()
+    session_data = {
+        'username': username,
+        'api_key': api_key,
+        'timestamp': str(datetime.datetime.now())
+    }
+    cookie_manager.set('session_data', json.dumps(session_data), expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+
+def load_session():
+    """Load session data from cookies"""
+    try:
+        cookie_manager = get_cookie_manager()
+        session_data = cookie_manager.get('session_data')
+        if session_data:
+            data = json.loads(session_data)
+            return data.get('username'), data.get('api_key')
+    except Exception as e:
+        st.error(f"Session loading error: {str(e)}")
+    return None, None
+
+def clear_session():
+    """Clear session data from cookies and session state"""
+    try:
+        cookie_manager = get_cookie_manager()
+        cookie_manager.delete('session_data')
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+    except Exception as e:
+        st.error(f"Session clearing error: {str(e)}")
+
 
 # Must be the first Streamlit command
 st.set_page_config(
@@ -101,25 +139,17 @@ client = None
 
 def init_session():
     """Initialize or restore session state"""
-    # Check for stored credentials in cookie
-    if 'stored_credentials' not in st.session_state:
-        st.session_state.stored_credentials = None
-    
-    # If user was previously logged in, restore session
-    if st.session_state.stored_credentials and not st.session_state.get('authenticated', False):
-        username, api_key = st.session_state.stored_credentials
-        st.session_state.authenticated = True
-        st.session_state.api_key = api_key
-        st.session_state.username = username
-        st.session_state.page = 'input'
-
+    if not st.session_state.get('authenticated', False):
+        username, api_key = load_session()
+        if username and api_key:
+            st.session_state.authenticated = True
+            st.session_state.api_key = api_key
+            st.session_state.username = username
+            st.session_state.page = 'input'
 def logout():
-    """Clear session state and stored credentials"""
-    if 'stored_credentials' in st.session_state:
-        del st.session_state.stored_credentials
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-
+    """Clear all session data"""
+    clear_session()
+    st.rerun()
 
 # Custom styling
 st.markdown("""
@@ -665,13 +695,27 @@ def display_generation_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+
+# Update the authenticated user display in main()
+def show_user_header():
+    """Display user header with logout button"""
+    if st.session_state.get('authenticated', False):
+        col1, col2 = st.columns([6, 1])
+        with col2:
+            if st.button("🚪 გასვლა", key="logout_button"):
+                logout()
+        with col1:
+            st.markdown(
+                f'<div class="user-info"><span>👤 {st.session_state.username}</span></div>',
+                unsafe_allow_html=True
+
 def main():
     """Main application function"""
     try:
         # Initialize session state
         init_session()
         
-        # Title and subtitle in a cleaner layout
+        # Title and subtitle
         st.markdown(
             '<div class="header">',
             unsafe_allow_html=True
@@ -680,25 +724,14 @@ def main():
         st.markdown("### შექმენი შენი უნიკალური სურათი")
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Show user info and logout button if authenticated
-        if st.session_state.get('authenticated', False):
-            col1, col2 = st.columns([6, 1])
-            with col2:
-                if st.button("🚪 გასვლა", key="logout_button"):
-                    logout()
-                    st.rerun()
-            with col1:
-                st.markdown(
-                    f'<div class="user-info"><span>👤 {st.session_state.username}</span></div>',
-                    unsafe_allow_html=True
-                )
+        # Show user header if authenticated
+        show_user_header()
 
         # Display appropriate page based on state
         if not st.session_state.get('authenticated', False):
             show_auth_page()
         else:
             try:
-                # Initialize OpenAI client with the stored API key
                 global client
                 client = OpenAI(api_key=st.session_state.api_key)
                 
@@ -709,11 +742,11 @@ def main():
                     display_generation_page()
             except Exception as e:
                 st.error(f"API შეცდომა: {str(e)}")
-                logout()  # Logout on API error
+                logout()
                 if st.button("🔄 ხელახლა შესვლა"):
                     st.rerun()
 
-        # Add minimal footer
+        # Footer
         st.markdown(
             """
             <div style='text-align: center; color: rgba(255,255,255,0.5); 
