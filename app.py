@@ -55,6 +55,7 @@ def create_user(username, password, api_key):
         conn.close()
 
 def verify_user(username, password):
+    """Verify user and store credentials if successful"""
     conn = sqlite3.connect('users.db', check_same_thread=False)
     c = conn.cursor()
     c.execute(
@@ -65,6 +66,8 @@ def verify_user(username, password):
     conn.close()
     
     if result and result[0] == hash_password(password):
+        # Store credentials in session state for persistence
+        st.session_state.stored_credentials = (username, result[1])
         return result[1]  # Return API key
     return None
 
@@ -95,6 +98,28 @@ if 'username' not in st.session_state:
 
 # Global client variable
 client = None
+
+def init_session():
+    """Initialize or restore session state"""
+    # Check for stored credentials in cookie
+    if 'stored_credentials' not in st.session_state:
+        st.session_state.stored_credentials = None
+    
+    # If user was previously logged in, restore session
+    if st.session_state.stored_credentials and not st.session_state.get('authenticated', False):
+        username, api_key = st.session_state.stored_credentials
+        st.session_state.authenticated = True
+        st.session_state.api_key = api_key
+        st.session_state.username = username
+        st.session_state.page = 'input'
+
+def logout():
+    """Clear session state and stored credentials"""
+    if 'stored_credentials' in st.session_state:
+        del st.session_state.stored_credentials
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
 
 # Custom styling
 st.markdown("""
@@ -643,6 +668,9 @@ def display_generation_page():
 def main():
     """Main application function"""
     try:
+        # Initialize session state
+        init_session()
+        
         # Title and subtitle in a cleaner layout
         st.markdown(
             '<div class="header">',
@@ -653,24 +681,20 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Show user info and logout button if authenticated
-        if st.session_state.authenticated:
-            st.markdown(
-                f'''
-                <div class="user-info">
-                    <span>👤 {st.session_state.username}</span>
-                    <button onclick="window.location.href='?clear_session=1'">🚪 გასვლა</button>
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
-            # Handle logout action
-            if "clear_session" in st.experimental_get_query_params():
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
-                st.rerun()
+        if st.session_state.get('authenticated', False):
+            col1, col2 = st.columns([6, 1])
+            with col2:
+                if st.button("🚪 გასვლა", key="logout_button"):
+                    logout()
+                    st.rerun()
+            with col1:
+                st.markdown(
+                    f'<div class="user-info"><span>👤 {st.session_state.username}</span></div>',
+                    unsafe_allow_html=True
+                )
 
         # Display appropriate page based on state
-        if not st.session_state.authenticated:
+        if not st.session_state.get('authenticated', False):
             show_auth_page()
         else:
             try:
@@ -678,16 +702,14 @@ def main():
                 global client
                 client = OpenAI(api_key=st.session_state.api_key)
                 
-                if st.session_state.page == 'input':
+                if st.session_state.get('page', 'input') == 'input':
                     display_input_page()
                     show_history()
                 else:
                     display_generation_page()
             except Exception as e:
                 st.error(f"API შეცდომა: {str(e)}")
-                # Reset authentication on API error
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
+                logout()  # Logout on API error
                 if st.button("🔄 ხელახლა შესვლა"):
                     st.rerun()
 
