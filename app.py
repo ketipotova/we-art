@@ -27,19 +27,7 @@ def init_db():
     conn.close()
 
 
-# Initialize session state
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = None
-if 'page' not in st.session_state:
-    st.session_state.page = 'auth'
-if 'user_data' not in st.session_state:
-    st.session_state.user_data = {}
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'username' not in st.session_state:
-    st.session_state.username = None
+
 
 
 def hash_password(password):
@@ -96,6 +84,8 @@ if 'user_data' not in st.session_state:
     st.session_state.user_data = {}
 if 'history' not in st.session_state:
     st.session_state.history = []
+if 'username' not in st.session_state:
+    st.session_state.username = None
 
 # Custom styling
 st.markdown("""
@@ -699,3 +689,13 @@ def main():
 
     except Exception as e:
         show_error_message(e)
+
+
+# Main execution
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        st.error(f"კრიტიკული შეცდომა: {str(e)}")
+        if st.button("🔄 გვერდის განახლება"):
+            st.rerun()
