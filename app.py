@@ -184,6 +184,12 @@ st.markdown("""
         transition: all 0.3s ease;
     }
 
+    /* Additional rule to hide any element that might be empty at the top */
+    .stApp > div:first-child:empty {
+        display: none;
+    }
+
+
     /* User info styling */
     .user-info {
         position: fixed;
