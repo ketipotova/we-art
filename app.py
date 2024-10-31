@@ -327,9 +327,10 @@ filters = {
     "კონტრასტული": "high contrast"
 }
 
-# Utility functions
+# Replace the get_cookie_manager function with this:
 def get_cookie_manager():
-    return stx.CookieManager()
+    """Get cookie manager with unique key"""
+    return stx.CookieManager(key="unique_cookie_manager")
 
 def create_qr_code(url):
     try:
@@ -643,11 +644,232 @@ def display_generation_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+
+# Import required libraries
+import streamlit as st
+from openai import OpenAI
+import time
+import qrcode
+from io import BytesIO
+import base64
+from PIL import Image
+import requests
+import hashlib
+import sqlite3
+from datetime import datetime
+import os
+import logging
+import extra_streamlit_components as stx
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = None
+if 'page' not in st.session_state:
+    st.session_state.page = 'auth'
+if 'user_data' not in st.session_state:
+    st.session_state.user_data = {}
+if 'history' not in st.session_state:
+    st.session_state.history = []
+if 'username' not in st.session_state:
+    st.session_state.username = None
+if 'authentication_status' not in st.session_state:
+    st.session_state.authentication_status = None
+
+# Global client variable
+client = None
+
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="AI სურათების გენერატორი",
+    page_icon="🎨",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+def init_db():
+    try:
+        conn = sqlite3.connect('users.db', check_same_thread=False)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                api_key TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_user(username, password, api_key):
+    conn = sqlite3.connect('users.db', check_same_thread=False)
+    c = conn.cursor()
+    try:
+        c.execute(
+            "INSERT INTO users (username, password_hash, api_key) VALUES (?, ?, ?)",
+            (username, hash_password(password), api_key)
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def verify_user(username, password):
+    conn = sqlite3.connect('users.db', check_same_thread=False)
+    c = conn.cursor()
+    c.execute(
+        "SELECT password_hash, api_key FROM users WHERE username = ?",
+        (username,)
+    )
+    result = c.fetchone()
+    conn.close()
+    
+    if result and result[0] == hash_password(password):
+        return result[1]  # Return API key
+    return None
+
+# Initialize the database
+init_db()
+
+# Add your existing CSS styles here (same as before)
+st.markdown("""
+    <style>
+    /* Your existing CSS styles */
+    </style>
+""", unsafe_allow_html=True)
+
+# Your existing data structures (hobbies, colors, styles, moods, filters)
+# Add them here...
+
+def create_qr_code(url):
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        buffered = BytesIO()
+        qr_image.save(buffered, format="PNG")
+        return buffered.getvalue()
+    except Exception as e:
+        st.error(f"QR კოდის შექმნის შეცდომა: {str(e)}")
+        return None
+
+def translate_user_data(user_data):
+    # Your existing translate_user_data function...
+    pass
+
+def create_personalized_prompt(user_data):
+    # Your existing create_personalized_prompt function...
+    pass
+
+def generate_dalle_image(prompt):
+    # Your existing generate_dalle_image function...
+    pass
+
+def add_to_history(image_url, prompt):
+    # Your existing add_to_history function...
+    pass
+
+def show_history():
+    # Your existing show_history function...
+    pass
+
+def show_error_message(error):
+    st.error(f"შეცდომა: {str(error)}")
+    if st.button("🔄 ხელახლა ცდა"):
+        st.rerun()
+
+def show_auth_page():
+    """Display authentication page"""
+    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+    st.title("მოგესალმებით! 👋")
+    
+    # Get cookie manager with unique key
+    cookie_manager = stx.CookieManager(key="unique_cookie_manager")
+    
+    tab1, tab2 = st.tabs(["შესვლა", "რეგისტრაცია"])
+    
+    with tab1:
+        with st.form("login_form"):
+            login_username = st.text_input("მომხმარებელი", key="login_username")
+            login_password = st.text_input("პაროლი", type="password", key="login_password")
+            login_submitted = st.form_submit_button("შესვლა")
+            
+            if login_submitted:
+                api_key = verify_user(login_username, login_password)
+                if api_key:
+                    # Set session state
+                    st.session_state.authenticated = True
+                    st.session_state.api_key = api_key
+                    st.session_state.username = login_username
+                    st.session_state.page = 'input'
+                    
+                    # Set cookies
+                    cookie_manager.set('authenticated', 'true', expires_at=None)
+                    cookie_manager.set('username', login_username, expires_at=None)
+                    cookie_manager.set('api_key', api_key, expires_at=None)
+                    
+                    st.success("წარმატებით შეხვედით სისტემაში!")
+                    st.rerun()
+                else:
+                    st.error("არასწორი მომხმარებელი ან პაროლი")
+
+    with tab2:
+        with st.form("register_form"):
+            new_username = st.text_input("მომხმარებელი")
+            new_password = st.text_input("პაროლი", type="password")
+            confirm_password = st.text_input("გაიმეორეთ პაროლი", type="password")
+            api_key = st.text_input("OpenAI API გასაღები", type="password")
+            register_submitted = st.form_submit_button("რეგისტრაცია")
+            
+            if register_submitted:
+                if new_password != confirm_password:
+                    st.error("პაროლები არ ემთხვევა")
+                elif len(new_password) < 6:
+                    st.error("პაროლი უნდა შეიცავდეს მინიმუმ 6 სიმბოლოს")
+                elif not api_key.startswith('sk-'):
+                    st.error("არასწორი API გასაღები")
+                else:
+                    if create_user(new_username, new_password, api_key):
+                        st.success("რეგისტრაცია წარმატებით დასრულდა! გთხოვთ შეხვიდეთ სისტემაში.")
+                    else:
+                        st.error("მომხმარებელი უკვე არსებობს")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def display_input_page():
+    # Your existing display_input_page function...
+    pass
+
+def display_generation_page():
+    # Your existing display_generation_page function...
+    pass
+
 def main():
     """Main application function"""
     
-    # Initialize cookie manager
-    cookie_manager = get_cookie_manager()
+    # Initialize cookie manager with unique key
+    cookie_manager = stx.CookieManager(key="unique_cookie_manager")
     
     # Check authentication from cookies if not in session state
     if not st.session_state.get('authenticated'):
