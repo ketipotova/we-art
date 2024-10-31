@@ -110,7 +110,11 @@ st.markdown("""
         margin: 0 auto !important;
     }
 
-    /* Hide empty feature containers */
+    /* Hide all empty containers */
+    .stContainer:empty,
+    .block-container:empty,
+    .input-container:empty,
+    .generation-container:empty,
     .feature-container:empty {
         display: none;
     }
@@ -243,7 +247,7 @@ st.markdown("""
         border-radius: 15px;
         margin: 1rem auto;
     }
-</style>
+    </style>
 """, unsafe_allow_html=True)
 
 
