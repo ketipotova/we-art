@@ -96,6 +96,7 @@ if 'username' not in st.session_state:
 # Global client variable
 client = None
 
+# First section - Replace the entire CSS block
 st.markdown("""
     <style>
     /* Hide Streamlit elements */
@@ -103,10 +104,16 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
+    /* Remove padding from the main container */
+    .main > div:first-child {
+        padding-top: 0 !important;
+    }
+    
     /* Remove empty frames by hiding the block-container padding */
     .block-container {
         max-width: 1000px !important;
-        padding: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
         margin: 0 auto !important;
     }
 
@@ -116,12 +123,21 @@ st.markdown("""
     .input-container:empty,
     .generation-container:empty,
     .feature-container:empty {
-        display: none;
+        display: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 
-    /* Hide empty element at the top */
-    .stApp > div:first-child:empty {
-        display: none;
+    /* Force remove top spacing */
+    .stApp > div:first-child {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    .element-container:empty {
+        display: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     /* Base theme */
@@ -209,19 +225,6 @@ st.markdown("""
         font-size: 0.9rem;
     }
 
-    .user-info button {
-        all: unset;
-        cursor: pointer;
-        color: rgba(255, 255, 255, 0.8) !important;
-        font-size: 0.9rem;
-        padding: 0 0.5rem !important;
-        transition: color 0.2s;
-    }
-
-    .user-info button:hover {
-        color: white !important;
-    }
-
     /* Header styling */
     .header {
         text-align: center;
@@ -254,6 +257,82 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Second section - Add these new functions after your imports and before main()
+def handle_logout():
+    """Handle logout functionality"""
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
+
+def show_user_info():
+    """Display user info and logout button"""
+    if st.session_state.authenticated:
+        st.markdown(
+            f"""
+            <div class="user-info">
+                <span>👤 {st.session_state.username}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        # Place logout button in the sidebar to ensure it's always visible
+        with st.sidebar:
+            if st.button("🚪 გასვლა", key="logout_button", on_click=handle_logout):
+                pass
+
+# Third section - Replace your main() function
+def main():
+    """Main application function"""
+    try:
+        # Title and subtitle in a cleaner layout
+        st.markdown(
+            '<div class="header">',
+            unsafe_allow_html=True
+        )
+        st.title("🎨 AI სურათების გენერატორი")
+        st.markdown("### შექმენი შენი უნიკალური სურათი")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Show user info with updated logout functionality
+        if st.session_state.authenticated:
+            show_user_info()
+
+        # Display appropriate page based on state
+        if not st.session_state.authenticated:
+            show_auth_page()
+        else:
+            try:
+                # Initialize OpenAI client with the stored API key
+                global client
+                client = OpenAI(api_key=st.session_state.api_key)
+                
+                if st.session_state.page == 'input':
+                    display_input_page()
+                    show_history()
+                else:
+                    display_generation_page()
+            except Exception as e:
+                st.error(f"API შეცდომა: {str(e)}")
+                # Reset authentication on API error
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                if st.button("🔄 ხელახლა შესვლა"):
+                    st.rerun()
+
+        # Add minimal footer
+        st.markdown(
+            """
+            <div style='text-align: center; color: rgba(255,255,255,0.5); 
+                 padding: 1rem 0; font-size: 0.8rem; margin-top: 2rem;'>
+            შექმნილია ❤️-ით DALL-E 3-ის გამოყენებით
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    except Exception as e:
+        show_error_message(e)
 
 
 
