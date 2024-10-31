@@ -1,4 +1,3 @@
-# Import required libraries
 import streamlit as st
 from openai import OpenAI
 import time
@@ -12,40 +11,12 @@ import sqlite3
 from datetime import datetime
 import os
 import logging
-import extra_streamlit_components as stx
-
-# Must be the very first Streamlit command
-st.set_page_config(
-    page_title="AI სურათების გენერატორი",
-    page_icon="🎨",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize session state
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = None
-if 'page' not in st.session_state:
-    st.session_state.page = 'auth'
-if 'user_data' not in st.session_state:
-    st.session_state.user_data = {}
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'username' not in st.session_state:
-    st.session_state.username = None
-if 'authentication_status' not in st.session_state:
-    st.session_state.authentication_status = None
-
-# Global client variable
-client = None
-
-# Database functions
+# Database setup
 def init_db():
     try:
         conn = sqlite3.connect('users.db', check_same_thread=False)
@@ -100,7 +71,32 @@ def verify_user(username, password):
 # Initialize the database
 init_db()
 
-# Load styles
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="AI სურათების გენერატორი",
+    page_icon="🎨",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# Initialize session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = None
+if 'page' not in st.session_state:
+    st.session_state.page = 'auth'
+if 'user_data' not in st.session_state:
+    st.session_state.user_data = {}
+if 'history' not in st.session_state:
+    st.session_state.history = []
+if 'username' not in st.session_state:
+    st.session_state.username = None
+
+# Global client variable
+client = None
+
+# Custom styling
 st.markdown("""
     <style>
     /* Hide Streamlit elements */
@@ -108,43 +104,11 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Remove padding from the main container */
-    .main > div:first-child {
-        padding-top: 0 !important;
-    }
-    
     /* Remove empty frames by hiding the block-container padding */
     .block-container {
         max-width: 1000px !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
+        padding: 0 !important;
         margin: 0 auto !important;
-    }
-
-    /* Hide all empty containers */
-    .stContainer:empty,
-    .block-container:empty,
-    .input-container:empty,
-    .generation-container:empty,
-    .feature-container:empty {
-        display: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-
-    /* Force remove top spacing */
-    .stApp > div:first-child {
-        padding-top: 0 !important;
-        margin-top: 0 !important;
-    }
-
-    /* Hide empty containers */
-    .element-container:has(> div.stMarkdown:empty),
-    .element-container:has(iframe[height="0"]) {
-        display: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 0 !important;
     }
 
     /* Base theme */
@@ -214,9 +178,13 @@ st.markdown("""
 
     /* User info styling */
     .user-info {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        z-index: 999;
         background: rgba(26, 26, 46, 0.8);
         padding: 0.5rem 1rem !important;
         border-radius: 20px;
@@ -228,11 +196,29 @@ st.markdown("""
         font-size: 0.9rem;
     }
 
+    .user-info button {
+        all: unset;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-size: 0.9rem;
+        padding: 0 0.5rem !important;
+        transition: color 0.2s;
+    }
+
+    .user-info button:hover {
+        color: white !important;
+    }
+
     /* Header styling */
     .header {
         text-align: center;
         margin: 2rem auto !important;
         padding: 0 !important;
+    }
+
+    /* Clean up form fields */
+    .stTextInput > div {
+        margin-bottom: 0 !important;
     }
 
     /* QR container */
@@ -326,8 +312,8 @@ filters = {
     "კონტრასტული": "high contrast"
 }
 
-# Utility functions
 def create_qr_code(url):
+    """Create a QR code for the given URL"""
     try:
         qr = qrcode.QRCode(
             version=1,
@@ -346,6 +332,7 @@ def create_qr_code(url):
         return None
 
 def translate_user_data(user_data):
+    """Translate Georgian user data to English"""
     return {
         "name": user_data['name'],
         "age": user_data['age'],
@@ -357,6 +344,7 @@ def translate_user_data(user_data):
     }
 
 def create_personalized_prompt(user_data):
+    """Create a personalized English prompt based on translated user information"""
     try:
         eng_data = translate_user_data(user_data)
 
@@ -403,6 +391,7 @@ def create_personalized_prompt(user_data):
         return None, None
 
 def generate_dalle_image(prompt):
+    """Generate image using DALL-E 3"""
     try:
         response = client.images.generate(
             model="dall-e-3",
@@ -418,6 +407,7 @@ def generate_dalle_image(prompt):
         return None
 
 def add_to_history(image_url, prompt):
+    """Add generated image to history"""
     if len(st.session_state.history) >= 5:
         st.session_state.history.pop(0)
 
@@ -427,7 +417,22 @@ def add_to_history(image_url, prompt):
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
     })
 
+def show_error_message(error):
+    """Display error message with retry option"""
+    st.error(f"შეცდომა: {str(error)}")
+    if st.button("🔄 ხელახლა ცდა"):
+        st.rerun()
+
+def validate_inputs(user_data):
+    """Validate user inputs before processing"""
+    if not user_data.get('name'):
+        return False, "გთხოვთ შეიყვანოთ სახელი"
+    if not user_data.get('hobby'):
+        return False, "გთხოვთ აირჩიოთ ჰობი"
+    return True, ""
+
 def show_history():
+    """Display history of generated images"""
     if st.session_state.history:
         with st.expander("🕒 წინა სურათები"):
             for item in reversed(st.session_state.history):
@@ -439,41 +444,26 @@ def show_history():
                     st.markdown(f"**აღწერა:** {item['prompt'][:100]}...")
                 st.markdown("---")
 
-def show_error_message(error):
-    st.error(f"შეცდომა: {str(error)}")
-    if st.button("🔄 ხელახლა ცდა"):
-        st.rerun()
-
 def show_auth_page():
     """Display authentication page"""
     st.markdown('<div class="auth-container">', unsafe_allow_html=True)
     st.title("მოგესალმებით! 👋")
     
-    # Get cookie manager with unique key
-    cookie_manager = stx.CookieManager(key="unique_cookie_manager")
-    
     tab1, tab2 = st.tabs(["შესვლა", "რეგისტრაცია"])
     
     with tab1:
         with st.form("login_form"):
-            login_username = st.text_input("მომხმარებელი", key="login_username")
-            login_password = st.text_input("პაროლი", type="password", key="login_password")
+            login_username = st.text_input("მომხმარებელი")
+            login_password = st.text_input("პაროლი", type="password")
             login_submitted = st.form_submit_button("შესვლა")
             
             if login_submitted:
                 api_key = verify_user(login_username, login_password)
                 if api_key:
-                    # Set session state
                     st.session_state.authenticated = True
                     st.session_state.api_key = api_key
                     st.session_state.username = login_username
                     st.session_state.page = 'input'
-                    
-                    # Set cookies
-                    cookie_manager.set('authenticated', 'true', expires_at=None)
-                    cookie_manager.set('username', login_username, expires_at=None)
-                    cookie_manager.set('api_key', api_key, expires_at=None)
-                    
                     st.success("წარმატებით შეხვედით სისტემაში!")
                     st.rerun()
                 else:
@@ -642,23 +632,8 @@ def display_generation_page():
 
 def main():
     """Main application function"""
-    
-    # Initialize cookie manager with unique key
-    cookie_manager = stx.CookieManager(key="unique_cookie_manager")
-    
-    # Check authentication from cookies if not in session state
-    if not st.session_state.get('authenticated'):
-        if cookie_manager.get('authenticated') == 'true':
-            username = cookie_manager.get('username')
-            api_key = cookie_manager.get('api_key')
-            if username and api_key:
-                st.session_state.authenticated = True
-                st.session_state.username = username
-                st.session_state.api_key = api_key
-                st.session_state.page = 'input'
-    
     try:
-        # Title and subtitle
+        # Title and subtitle in a cleaner layout
         st.markdown(
             '<div class="header">',
             unsafe_allow_html=True
@@ -668,35 +643,24 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Show user info and logout button if authenticated
-        if st.session_state.get('authenticated'):
-            # Create a container for user info and logout button
-            user_container = st.container()
-            with user_container:
-                cols = st.columns([6, 1])
-                with cols[0]:
-                    st.markdown(
-                        f"""
-                        <div class="user-info">
-                            <span>👤 {st.session_state.username}</span>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                with cols[1]:
-                    if st.button("🚪 გასვლა", key="logout_button"):
-                        # Clear cookies
-                        cookie_manager.delete('authenticated')
-                        cookie_manager.delete('username')
-                        cookie_manager.delete('api_key')
-                        
-                        # Clear session state
-                        for key in list(st.session_state.keys()):
-                            del st.session_state[key]
-                            
-                        st.rerun()
+        if st.session_state.authenticated:
+            st.markdown(
+                f'''
+                <div class="user-info">
+                    <span>👤 {st.session_state.username}</span>
+                    <button onclick="window.location.href='?clear_session=1'">🚪 გასვლა</button>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+            # Handle logout action
+            if "clear_session" in st.experimental_get_query_params():
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                st.rerun()
 
         # Display appropriate page based on state
-        if not st.session_state.get('authenticated'):
+        if not st.session_state.authenticated:
             show_auth_page()
         else:
             try:
@@ -707,7 +671,7 @@ def main():
                 if st.session_state.page == 'input':
                     display_input_page()
                     show_history()
-                elif st.session_state.page == 'generate':
+                else:
                     display_generation_page()
             except Exception as e:
                 st.error(f"API შეცდომა: {str(e)}")
@@ -731,6 +695,7 @@ def main():
     except Exception as e:
         show_error_message(e)
 
+# Main execution
 if __name__ == "__main__":
     try:
         main()
