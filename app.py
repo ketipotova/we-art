@@ -10,25 +10,31 @@ import hashlib
 import sqlite3
 from datetime import datetime
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Database setup
 def init_db():
-    conn = sqlite3.connect('users.db', check_same_thread=False)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL,
-            api_key TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-
-
-
+    try:
+        conn = sqlite3.connect('users.db', check_same_thread=False)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                api_key TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -87,7 +93,10 @@ if 'history' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state.username = None
 
-# Update the CSS section with these modifications:
+# Global client variable
+client = None
+
+# Custom styling
 st.markdown("""
     <style>
     /* Hide Streamlit elements */
@@ -102,73 +111,133 @@ st.markdown("""
         margin: 0 auto !important;
     }
 
-    /* Remove default padding and background from main content */
-    .main > div:first-child {
-        padding: 0 !important;
+    /* Base theme */
+    .stApp {
+        background: linear-gradient(150deg, #1a1a2e 0%, #16213e 100%);
+        color: white;
+        margin-top: 1rem;
     }
 
-    /* Style for the login status and logout button */
+    /* Container styling */
+    .input-container, .generation-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2rem;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        margin: 1rem auto;
+        max-width: 900px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Auth container */
+    .auth-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2rem;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        margin: 2rem auto;
+        max-width: 500px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Feature container */
+    .feature-container {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+
+    /* Input styling */
+    .stTextInput > div > div > input {
+        background: rgba(255, 255, 255, 0.07);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+    }
+
+    /* Select box styling */
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        color: white !important;
+    }
+
+    /* Button styling */
+    .stButton > button {
+        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
+        color: #1a1a2e;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        font-weight: bold;
+        width: 100%;
+        transition: all 0.3s ease;
+    }
+
+    /* User info styling */
     .user-info {
-        position: absolute;
+        position: fixed;
         top: 1rem;
         right: 1rem;
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        background: none !important;
-        padding: 0 !important;
+        z-index: 999;
+        background: rgba(26, 26, 46, 0.8);
+        padding: 0.5rem 1rem !important;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+    }
+
+    .user-info span {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
     }
 
     .user-info button {
-        background: none !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: white !important;
-        padding: 0.3rem 0.8rem !important;
-        font-size: 0.9rem !important;
-        opacity: 0.8;
-        transition: opacity 0.2s;
+        all: unset;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-size: 0.9rem;
+        padding: 0 0.5rem !important;
+        transition: color 0.2s;
     }
 
     .user-info button:hover {
-        opacity: 1;
-        transform: none !important;
-        box-shadow: none !important;
+        color: white !important;
     }
 
-    /* Adjust header margin */
+    /* Header styling */
     .header {
         text-align: center;
         margin: 2rem auto !important;
         padding: 0 !important;
     }
 
-    /* Remove default container margins */
-    .element-container, .stMarkdown {
-        margin: 0 !important;
+    /* Clean up form fields */
+    .stTextInput > div {
+        margin-bottom: 0 !important;
     }
 
-    /* Style the main containers without extra padding */
-    .auth-container, .input-container, .generation-container {
-        margin: 2rem auto !important;
-        padding: 2rem !important;
+    /* QR container */
+    .qr-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        margin: 1rem auto;
+        max-width: 250px;
     }
 
-    /* Remove extra spacing between elements */
-    .stButton {
-        margin: 0 !important;
-    }
-
-    /* Clean up tabs appearance */
-    .stTabs {
-        background: none !important;
-        border: none !important;
-        margin: 0 !important;
-    }
-
-    .stTab {
-        background: none !important;
-        border: none !important;
+    /* Instructions container */
+    .instructions-container {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin: 1rem auto;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -243,87 +312,6 @@ filters = {
     "კონტრასტული": "high contrast"
 }
 
-
-
-def display_input_page():
-    """Display the input form page"""
-    st.markdown('<div class="input-container">', unsafe_allow_html=True)
-
-    # Create two rows with four columns each
-    row1_col1, row1_col2, row1_col3, row1_col4 = st.columns(4)
-    row2_col1, row2_col2, row2_col3, row2_col4 = st.columns(4)
-
-    with row1_col1:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">👤 სახელი</p>', unsafe_allow_html=True)
-        name = st.text_input("", placeholder="მაგ: გიორგი", label_visibility="collapsed", key="name_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row1_col2:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">🎂 ასაკი</p>', unsafe_allow_html=True)
-        age = st.number_input("", min_value=5, max_value=100, value=25, label_visibility="collapsed", key="age_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row1_col3:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">🎯 კატეგორია</p>', unsafe_allow_html=True)
-        hobby_category = st.selectbox("", list(hobbies.keys()), label_visibility="collapsed", key="category_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row1_col4:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">🎨 ჰობი</p>', unsafe_allow_html=True)
-        hobby = st.selectbox("", list(hobbies[hobby_category].keys()), label_visibility="collapsed", key="hobby_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row2_col1:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">🎨 ფერი</p>', unsafe_allow_html=True)
-        color = st.selectbox("", list(colors.keys()), label_visibility="collapsed", key="color_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row2_col2:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">🖼️ სტილი</p>', unsafe_allow_html=True)
-        style = st.selectbox("", list(styles.keys()), label_visibility="collapsed", key="style_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row2_col3:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">😊 განწყობა</p>', unsafe_allow_html=True)
-        mood = st.selectbox("", list(moods.keys()), label_visibility="collapsed", key="mood_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with row2_col4:
-        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
-        st.markdown('<p class="feature-label">🌈 ფილტრი</p>', unsafe_allow_html=True)
-        filter_effect = st.selectbox("", list(filters.keys()), label_visibility="collapsed", key="filter_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Generate button
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("✨ შექმენი სურათი", use_container_width=True):
-            if not name:
-                st.error("გთხოვთ შეიყვანოთ სახელი")
-                return
-
-            st.session_state.user_data = {
-                "name": name,
-                "age": age,
-                "hobby_category": hobby_category,
-                "hobby": hobby,
-                "color": color,
-                "style": style,
-                "mood": mood,
-                "filter": filter_effect
-            }
-            st.session_state.page = 'generate'
-            st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-# Helper Functions
 def create_qr_code(url):
     """Create a QR code for the given URL"""
     try:
@@ -429,8 +417,6 @@ def add_to_history(image_url, prompt):
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
     })
 
-
-
 def show_error_message(error):
     """Display error message with retry option"""
     st.error(f"შეცდომა: {str(error)}")
@@ -457,8 +443,6 @@ def show_history():
                     st.markdown(f"**დრო:** {item['timestamp']}")
                     st.markdown(f"**აღწერა:** {item['prompt'][:100]}...")
                 st.markdown("---")
-
-
 
 def show_auth_page():
     """Display authentication page"""
@@ -505,6 +489,85 @@ def show_auth_page():
                         st.success("რეგისტრაცია წარმატებით დასრულდა! გთხოვთ შეხვიდეთ სისტემაში.")
                     else:
                         st.error("მომხმარებელი უკვე არსებობს")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def display_input_page():
+    """Display the input form page"""
+    st.markdown('<div class="input-container">', unsafe_allow_html=True)
+
+    # Create two rows with four columns each
+    row1_col1, row1_col2, row1_col3, row1_col4 = st.columns(4)
+    row2_col1, row2_col2, row2_col3, row2_col4 = st.columns(4)
+
+    with row1_col1:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">👤 სახელი</p>', unsafe_allow_html=True)
+        name = st.text_input("", placeholder="მაგ: გიორგი", label_visibility="collapsed", key="name_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row1_col2:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎂 ასაკი</p>', unsafe_allow_html=True)
+        age = st.number_input("", min_value=5, max_value=100, value=25, label_visibility="collapsed", key="age_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row1_col3:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎯 კატეგორია</p>', unsafe_allow_html=True)
+        hobby_category = st.selectbox("", list(hobbies.keys()), label_visibility="collapsed", key="category_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row1_col4:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎨 ჰობი</p>', unsafe_allow_html=True)
+        hobby = st.selectbox("", list(hobbies[hobby_category].keys()), label_visibility="collapsed", key="hobby_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col1:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🎨 ფერი</p>', unsafe_allow_html=True)
+        color = st.selectbox("", list(colors.keys()), label_visibility="collapsed", key="color_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col2:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🖼️ სტილი</p>', unsafe_allow_html=True)
+        style = st.selectbox("", list(styles.keys()), label_visibility="collapsed", key="style_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col3:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">😊 განწყობა</p>', unsafe_allow_html=True)
+        mood = st.selectbox("", list(moods.keys()), label_visibility="collapsed", key="mood_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with row2_col4:
+        st.markdown('<div class="feature-container">', unsafe_allow_html=True)
+        st.markdown('<p class="feature-label">🌈 ფილტრი</p>', unsafe_allow_html=True)
+        filter_effect = st.selectbox("", list(filters.keys()), label_visibility="collapsed", key="filter_input")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Generate button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("✨ შექმენი სურათი", use_container_width=True):
+            if not name:
+                st.error("გთხოვთ შეიყვანოთ სახელი")
+                return
+
+            st.session_state.user_data = {
+                "name": name,
+                "age": age,
+                "hobby_category": hobby_category,
+                "hobby": hobby,
+                "color": color,
+                "style": style,
+                "mood": mood,
+                "filter": filter_effect
+            }
+            st.session_state.page = 'generate'
+            st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -567,8 +630,6 @@ def display_generation_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-client = None  # Add this before main()
-
 def main():
     """Main application function"""
     try:
@@ -598,6 +659,41 @@ def main():
                     del st.session_state[key]
                 st.rerun()
 
+        # Display appropriate page based on state
+        if not st.session_state.authenticated:
+            show_auth_page()
+        else:
+            try:
+                # Initialize OpenAI client with the stored API key
+                global client
+                client = OpenAI(api_key=st.session_state.api_key)
+                
+                if st.session_state.page == 'input':
+                    display_input_page()
+                    show_history()
+                else:
+                    display_generation_page()
+            except Exception as e:
+                st.error(f"API შეცდომა: {str(e)}")
+                # Reset authentication on API error
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+                if st.button("🔄 ხელახლა შესვლა"):
+                    st.rerun()
+
+        # Add minimal footer
+        st.markdown(
+            """
+            <div style='text-align: center; color: rgba(255,255,255,0.5); 
+                 padding: 1rem 0; font-size: 0.8rem; margin-top: 2rem;'>
+            შექმნილია ❤️-ით DALL-E 3-ის გამოყენებით
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    except Exception as e:
+        show_error_message(e)
 
 # Main execution
 if __name__ == "__main__":
