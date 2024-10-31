@@ -87,146 +87,88 @@ if 'history' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state.username = None
 
-# Custom styling
+# Update the CSS section with these modifications:
 st.markdown("""
     <style>
     /* Hide Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
-    /* Control width and padding */
+    
+    /* Remove empty frames by hiding the block-container padding */
     .block-container {
         max-width: 1000px !important;
-        padding-top: 1rem !important;
-        padding-bottom: 0rem !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
     }
 
-    /* Base theme */
-    .stApp {
-        background: linear-gradient(150deg, #1a1a2e 0%, #16213e 100%);
-        color: white;
+    /* Remove default padding and background from main content */
+    .main > div:first-child {
+        padding: 0 !important;
     }
 
-    /* Container styling */
-    .input-container, .generation-container {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 2rem;
-        border-radius: 20px;
-        backdrop-filter: blur(10px);
-        margin: 1rem auto;
-        max-width: 900px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+    /* Style for the login status and logout button */
+    .user-info {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: none !important;
+        padding: 0 !important;
     }
 
-    /* Auth container */
-    .auth-container {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 2rem;
-        border-radius: 20px;
-        backdrop-filter: blur(10px);
-        margin: 2rem auto;
-        max-width: 500px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    /* Feature container */
-    .feature-container {
-        background: rgba(255, 255, 255, 0.08);
-        padding: 1rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-    }
-
-    /* Input styling */
-    .stTextInput > div > div > input {
-        background: rgba(255, 255, 255, 0.07);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        padding: 0.75rem 1rem;
-    }
-
-    /* Select box styling */
-    .stSelectbox > div > div {
-        background: rgba(255, 255, 255, 0.07);
-        border-radius: 10px;
+    .user-info button {
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
         color: white !important;
+        padding: 0.3rem 0.8rem !important;
+        font-size: 0.9rem !important;
+        opacity: 0.8;
+        transition: opacity 0.2s;
     }
 
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
-        color: #1a1a2e;
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: 10px;
-        font-weight: bold;
-        width: 100%;
-        transition: all 0.3s ease;
+    .user-info button:hover {
+        opacity: 1;
+        transform: none !important;
+        box-shadow: none !important;
     }
 
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(255, 154, 158, 0.4);
-    }
-
-    /* QR container */
-    .qr-container {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 15px;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        margin: 1rem auto;
-        max-width: 250px;
-    }
-
-    /* Instructions container */
-    .instructions-container {
-        background: rgba(255, 255, 255, 0.08);
-        padding: 1.5rem;
-        border-radius: 15px;
-        margin: 1rem auto;
-    }
-
-    /* Progress bar */
-    .stProgress > div > div > div {
-        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
-    }
-
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        padding: 0.5rem;
-    }
-
-    .stTabs [data-baseweb="tab"] {
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-    }
-
-    .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    /* Responsive images */
-    img {
-        max-width: 100%;
-        height: auto;
-    }
-
-    /* Header styling */
+    /* Adjust header margin */
     .header {
         text-align: center;
-        margin-bottom: 2rem;
+        margin: 2rem auto !important;
+        padding: 0 !important;
     }
 
-    /* Make columns more compact */
-    .stColumn {
-        padding: 0 0.5rem;
+    /* Remove default container margins */
+    .element-container, .stMarkdown {
+        margin: 0 !important;
+    }
+
+    /* Style the main containers without extra padding */
+    .auth-container, .input-container, .generation-container {
+        margin: 2rem auto !important;
+        padding: 2rem !important;
+    }
+
+    /* Remove extra spacing between elements */
+    .stButton {
+        margin: 0 !important;
+    }
+
+    /* Clean up tabs appearance */
+    .stTabs {
+        background: none !important;
+        border: none !important;
+        margin: 0 !important;
+    }
+
+    .stTab {
+        background: none !important;
+        border: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -630,65 +572,31 @@ client = None  # Add this before main()
 def main():
     """Main application function"""
     try:
-        # Display header with minimal padding
+        # Title and subtitle in a cleaner layout
         st.markdown(
-            '<div class="header" style="padding: 1rem 0;">',
+            '<div class="header">',
             unsafe_allow_html=True
         )
-        
-        # Title and subtitle
-        col1, col2 = st.columns([6, 1])
-        with col1:
-            st.title("🎨 AI სურათების გენერატორი")
-            st.markdown("### შექმენი შენი უნიკალური სურათი")
+        st.title("🎨 AI სურათების გენერატორი")
+        st.markdown("### შექმენი შენი უნიკალური სურათი")
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Show user info and logout button if authenticated
         if st.session_state.authenticated:
-            with col2:
-                st.markdown(f"**👤 {st.session_state.username}**")
-                if st.button("🚪 გასვლა"):
-                    # Clear all session state
-                    for key in list(st.session_state.keys()):
-                        del st.session_state[key]
-                    st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Display appropriate page based on state
-        if not st.session_state.authenticated:
-            show_auth_page()
-        else:
-            try:
-                # Initialize OpenAI client with the stored API key
-                global client
-                client = OpenAI(api_key=st.session_state.api_key)
-                
-                if st.session_state.page == 'input':
-                    display_input_page()
-                    show_history()
-                else:
-                    display_generation_page()
-            except Exception as e:
-                st.error(f"API შეცდომა: {str(e)}")
-                # Reset authentication on API error
+            st.markdown(
+                f'''
+                <div class="user-info">
+                    <span>👤 {st.session_state.username}</span>
+                    <button onclick="window.location.href='?clear_session=1'">🚪 გასვლა</button>
+                </div>
+                ''',
+                unsafe_allow_html=True
+            )
+            # Handle logout action
+            if "clear_session" in st.experimental_get_query_params():
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
-                if st.button("🔄 ხელახლა შესვლა"):
-                    st.rerun()
-
-        # Add minimal footer
-        st.markdown(
-            """
-            <div style='text-align: center; color: rgba(255,255,255,0.5); 
-                 padding: 1rem 0; font-size: 0.8rem; margin-top: 2rem;'>
-            შექმნილია ❤️-ით DALL-E 3-ის გამოყენებით
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    except Exception as e:
-        show_error_message(e)
+                st.rerun()
 
 
 # Main execution
