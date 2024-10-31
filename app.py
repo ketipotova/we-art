@@ -1,3 +1,4 @@
+# Part 1: Imports and Initial Setup
 import streamlit as st
 from openai import OpenAI
 import time
@@ -14,37 +15,56 @@ import logging
 import extra_streamlit_components as stx
 import json
 
-# Cookie Manager setup
-def get_cookie_manager():
-    return stx.CookieManager()
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Error handling functions
+def show_error_message(error, show_retry=True):
+    """Display error message with optional retry button"""
+    error_container = st.empty()
+    with error_container.container():
+        st.error(f"შეცდომა: {str(error)}")
+        if show_retry:
+            if st.button("🔄 ხელახლა ცდა", key="retry_button"):
+                st.rerun()
+
+def handle_error(func):
+    """Decorator for handling function errors"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error in {func.__name__}: {str(e)}")
+            show_error_message(e)
+            return None
+    return wrapper
+
+# Cookie Manager setup
+def get_cookie_manager():
+    return stx.CookieManager()
+
 # Database setup
+@handle_error
 def init_db():
-    try:
-        conn = sqlite3.connect('users.db', check_same_thread=False)
-        c = conn.cursor()
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password_hash TEXT NOT NULL,
-                api_key TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        conn.close()
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing database: {str(e)}")
-        raise
+    conn = sqlite3.connect('users.db', check_same_thread=False)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            api_key TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    logger.info("Database initialized successfully")
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+@handle_error
 def create_user(username, password, api_key):
     conn = sqlite3.connect('users.db', check_same_thread=False)
     c = conn.cursor()
@@ -60,6 +80,7 @@ def create_user(username, password, api_key):
     finally:
         conn.close()
 
+@handle_error
 def verify_user(username, password):
     conn = sqlite3.connect('users.db', check_same_thread=False)
     c = conn.cursor()
@@ -78,6 +99,9 @@ def verify_user(username, password):
     finally:
         conn.close()
 
+# Part 2: Session Management and Configuration
+
+@handle_error
 def save_session(username, api_key):
     cookie_manager = get_cookie_manager()
     session_data = {
@@ -87,6 +111,7 @@ def save_session(username, api_key):
     }
     cookie_manager.set('session_data', json.dumps(session_data), expires_at=datetime.now() + datetime.timedelta(days=30))
 
+@handle_error
 def load_session():
     try:
         cookie_manager = get_cookie_manager()
@@ -98,6 +123,7 @@ def load_session():
         logger.error(f"Session loading error: {str(e)}")
     return None, None
 
+@handle_error
 def clear_session():
     try:
         cookie_manager = get_cookie_manager()
@@ -106,6 +132,9 @@ def clear_session():
             del st.session_state[key]
     except Exception as e:
         logger.error(f"Session clearing error: {str(e)}")
+
+# Initialize the database
+init_db()
 
 # Page Configuration
 st.set_page_config(
@@ -116,22 +145,223 @@ st.set_page_config(
 )
 
 # Initialize session state
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'api_key' not in st.session_state:
-    st.session_state.api_key = None
-if 'page' not in st.session_state:
-    st.session_state.page = 'auth'
-if 'user_data' not in st.session_state:
-    st.session_state.user_data = {}
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'username' not in st.session_state:
-    st.session_state.username = None
+def init_session_state():
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    if 'api_key' not in st.session_state:
+        st.session_state.api_key = None
+    if 'page' not in st.session_state:
+        st.session_state.page = 'auth'
+    if 'user_data' not in st.session_state:
+        st.session_state.user_data = {}
+    if 'history' not in st.session_state:
+        st.session_state.history = []
+    if 'username' not in st.session_state:
+        st.session_state.username = None
+    if 'error' not in st.session_state:
+        st.session_state.error = None
 
 # Global client variable
 client = None
 
+# Data structures
+hobbies = {
+    "სპორტი": {
+        "ფეხბურთი": "football",
+        "კალათბურთი": "basketball",
+        "ჭადრაკი": "chess",
+        "ცურვა": "swimming",
+        "იოგა": "yoga",
+        "ჩოგბურთი": "tennis",
+        "სირბილი": "running"
+    },
+    "ხელოვნება": {
+        "ხატვა": "painting",
+        "მუსიკა": "music",
+        "ცეკვა": "dancing",
+        "ფოტოგრაფია": "photography",
+        "კერამიკა": "ceramics",
+        "ქარგვა": "embroidery"
+    },
+    "ტექნოლოგია": {
+        "პროგრამირება": "programming",
+        "გეიმინგი": "gaming",
+        "რობოტიკა": "robotics",
+        "3D მოდელირება": "3D modeling",
+        "AI": "artificial intelligence"
+    },
+    "ბუნება": {
+        "მებაღეობა": "gardening",
+        "ლაშქრობა": "hiking",
+        "კემპინგი": "camping",
+        "ალპინიზმი": "mountain climbing"
+    }
+}
+
+colors = {
+    "წითელი": "red",
+    "ლურჯი": "blue",
+    "მწვანე": "green",
+    "ყვითელი": "yellow",
+    "იისფერი": "purple",
+    "ოქროსფერი": "gold",
+    "ვერცხლისფერი": "silver",
+    "ცისფერი": "light blue"
+}
+
+styles = {
+    "რეალისტური": "realistic",
+    "ფანტასტიკური": "fantastic",
+    "მულტიპლიკაციური": "cartoon",
+    "ანიმე": "anime",
+    "იმპრესიონისტული": "impressionistic"
+}
+
+moods = {
+    "მხიარული": "cheerful",
+    "მშვიდი": "peaceful",
+    "ენერგიული": "energetic",
+    "რომანტიული": "romantic",
+    "სათავგადასავლო": "adventurous",
+    "ნოსტალგიური": "nostalgic"
+}
+
+filters = {
+    "ბუნებრივი": "natural",
+    "რეტრო": "retro",
+    "დრამატული": "dramatic",
+    "ნათელი": "bright",
+    "კონტრასტული": "high contrast"
+}
+
+# Part 3: Authentication and Core UI Components
+
+# Custom styling
+st.markdown("""
+    <style>
+    /* Hide Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Remove empty frames by hiding the block-container padding */
+    .block-container {
+        max-width: 1000px !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+    }
+
+    /* Hide all empty containers */
+    .stContainer:empty,
+    .block-container:empty,
+    .input-container:empty,
+    .generation-container:empty,
+    .feature-container:empty {
+        display: none;
+    }
+
+    /* Base theme */
+    .stApp {
+        background: linear-gradient(150deg, #1a1a2e 0%, #16213e 100%);
+        color: white;
+        margin-top: 1rem;
+    }
+
+    /* Container styling */
+    .input-container, .generation-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2rem;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        margin: 1rem auto;
+        max-width: 900px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Auth container */
+    .auth-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 2rem;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        margin: 2rem auto;
+        max-width: 500px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Feature container */
+    .feature-container {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+
+    /* Input styling */
+    .stTextInput > div > div > input {
+        background: rgba(255, 255, 255, 0.07);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+    }
+
+    /* Select box styling */
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 10px;
+        color: white !important;
+    }
+
+    /* Button styling */
+    .stButton > button {
+        background: linear-gradient(45deg, #FF9A9E, #FAD0C4);
+        color: #1a1a2e;
+        border: none;
+        padding: 0.75rem 2rem;
+        border-radius: 10px;
+        font-weight: bold;
+        width: 100%;
+        transition: all 0.3s ease;
+    }
+
+    /* User info styling */
+    .user-info {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        z-index: 999;
+        background: rgba(26, 26, 46, 0.8);
+        padding: 0.5rem 1rem !important;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+    }
+
+    /* QR container */
+    .qr-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        margin: 1rem auto;
+        max-width: 250px;
+    }
+
+    /* Instructions container */
+    .instructions-container {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 1.5rem;
+        border-radius: 15px;
+        margin: 1rem auto;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+@handle_error
 def show_auth_page():
     st.markdown('<div class="auth-container">', unsafe_allow_html=True)
     st.title("მოგესალმებით! 👋")
@@ -153,7 +383,7 @@ def show_auth_page():
                     st.session_state.page = 'input'
                     st.rerun()
                 else:
-                    st.error("არასწორი მომხმარებელი ან პაროლი")
+                    show_error_message("არასწორი მომხმარებელი ან პაროლი", show_retry=False)
 
     with tab2:
         with st.form(key="register_form"):
@@ -165,19 +395,55 @@ def show_auth_page():
             
             if register_submitted:
                 if new_password != confirm_password:
-                    st.error("პაროლები არ ემთხვევა")
+                    show_error_message("პაროლები არ ემთხვევა", show_retry=False)
                 elif len(new_password) < 6:
-                    st.error("პაროლი უნდა შეიცავდეს მინიმუმ 6 სიმბოლოს")
+                    show_error_message("პაროლი უნდა შეიცავდეს მინიმუმ 6 სიმბოლოს", show_retry=False)
                 elif not api_key.startswith('sk-'):
-                    st.error("არასწორი API გასაღები")
+                    show_error_message("არასწორი API გასაღები", show_retry=False)
                 else:
                     if create_user(new_username, new_password, api_key):
                         st.success("რეგისტრაცია წარმატებით დასრულდა! გთხოვთ შეხვიდეთ სისტემაში.")
                     else:
-                        st.error("მომხმარებელი უკვე არსებობს")
+                        show_error_message("მომხმარებელი უკვე არსებობს", show_retry=False)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+def create_qr_code(url):
+    """Create a QR code for the given URL"""
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        buffered = BytesIO()
+        qr_image.save(buffered, format="PNG")
+        return buffered.getvalue()
+    except Exception as e:
+        logger.error(f"QR code creation error: {str(e)}")
+        return None
+
+def show_user_header():
+    """Display user header with logout button"""
+    if st.session_state.get('authenticated', False):
+        col1, col2 = st.columns([6, 1])
+        with col2:
+            if st.button("🚪 გასვლა", key="logout_button"):
+                clear_session()
+                st.rerun()
+        with col1:
+            st.markdown(
+                f'<div class="user-info"><span>👤 {st.session_state.username}</span></div>',
+                unsafe_allow_html=True
+            )
+
+# Part 4: Core Functionality and Main Logic
+
+@handle_error
 def display_input_page():
     """Display the input form page"""
     st.markdown('<div class="input-container">', unsafe_allow_html=True)
@@ -237,9 +503,9 @@ def display_input_page():
     # Generate button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("✨ შექმენი სურათი", use_container_width=True):
+        if st.button("✨ შექმენი სურათი", use_container_width=True, key="generate_button"):
             if not name:
-                st.error("გთხოვთ შეიყვანოთ სახელი")
+                show_error_message("გთხოვთ შეიყვანოთ სახელი", show_retry=False)
                 return
 
             st.session_state.user_data = {
@@ -257,6 +523,82 @@ def display_input_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+def translate_user_data(user_data):
+    """Translate Georgian user data to English"""
+    return {
+        "name": user_data['name'],
+        "age": user_data['age'],
+        "hobby": hobbies[user_data['hobby_category']][user_data['hobby']],
+        "color": colors[user_data['color']],
+        "style": styles[user_data['style']],
+        "mood": moods[user_data['mood']],
+        "filter": filters[user_data['filter']]
+    }
+
+def create_personalized_prompt(user_data):
+    """Create a personalized English prompt based on translated user information"""
+    try:
+        eng_data = translate_user_data(user_data)
+
+        prompt_request = f"""
+        Create a detailed image prompt for a {eng_data['age']}-year-old named {eng_data['name']} 
+        who loves {eng_data['hobby']}. 
+
+        Key elements to incorporate:
+        - Favorite color: {eng_data['color']}
+        - Visual style: {eng_data['style']}
+        - Mood: {eng_data['mood']}
+        - Filter effect: {eng_data['filter']}
+
+        Create a personalized, artistic scene that captures their interests and personality.
+        Focus on cinematic composition, dramatic lighting, and high-quality details.
+        Make it engaging and suitable for an expo demonstration.
+        Ensure the image is family-friendly and appropriate for all ages.
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system",
+                 "content": "You are an expert at crafting detailed image generation prompts. Focus on creating vivid, specific descriptions that work well with DALL-E 3."},
+                {"role": "user", "content": prompt_request}
+            ],
+            temperature=0.7
+        )
+
+        english_prompt = response.choices[0].message.content
+
+        georgian_summary = f"""🎨 რას ვქმნით: 
+        პერსონალიზებული სურათი {user_data['name']}-სთვის
+        • ჰობი: {user_data['hobby']}
+        • სტილი: {user_data['style']}
+        • განწყობა: {user_data['mood']}
+        • ფილტრი: {user_data['filter']}
+        """
+
+        return english_prompt, georgian_summary
+
+    except Exception as e:
+        logger.error(f"Error creating prompt: {str(e)}")
+        return None, None
+
+def generate_dalle_image(prompt):
+    """Generate image using DALL-E 3"""
+    try:
+        response = client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1792x1024",
+            quality="hd",
+            style="vivid",
+            n=1
+        )
+        return response.data[0].url
+    except Exception as e:
+        logger.error(f"Error generating image: {str(e)}")
+        return None
+
+@handle_error
 def display_generation_page():
     """Display the image generation and result page"""
     st.markdown('<div class="generation-container">', unsafe_allow_html=True)
@@ -277,8 +619,6 @@ def display_generation_page():
 
             image_url = generate_dalle_image(english_prompt)
             if image_url:
-                add_to_history(image_url, english_prompt)
-
                 st.success("✨ თქვენი სურათი მზადაა!")
                 st.image(image_url, caption="შენი პერსონალური AI სურათი", use_column_width=True)
 
@@ -310,81 +650,50 @@ def display_generation_page():
                         unsafe_allow_html=True
                     )
                 with col2:
-                    if st.button("🔄 ახალი სურათი"):
+                    if st.button("🔄 ახალი სურათი", key="new_image_button"):
                         st.session_state.page = 'input'
                         st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-
-def show_user_header():
-    """Display user header with logout button"""
-    if st.session_state.get('authenticated', False):
-        col1, col2 = st.columns([6, 1])
-        with col2:
-            if st.button("🚪 გასვლა", key="logout_button"):
-                logout()
-        with col1:
-            st.markdown(
-                f'<div class="user-info"><span>👤 {st.session_state.username}</span></div>',
-                unsafe_allow_html=True
-            )
-
+@handle_error
 def main():
     """Main application function"""
-    try:
-        # Initialize session state
-        init_session()
-        
-        # Title and subtitle
-        st.markdown(
-            '<div class="header">',
-            unsafe_allow_html=True
-        )
-        st.title("🎨 AI სურათების გენერატორი")
-        st.markdown("### შექმენი შენი უნიკალური სურათი")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Show user header if authenticated
-        show_user_header()
+    # Initialize session state
+    init_session_state()
+    
+    # Title and subtitle
+    st.markdown(
+        '<div class="header">',
+        unsafe_allow_html=True
+    )
+    st.title("🎨 AI სურათების გენერატორი")
+    st.markdown("### შექმენი შენი უნიკალური სურათი")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        # Display appropriate page based on state
+    # Show user header if authenticated
+    show_user_header()
+
+    try:
         if not st.session_state.get('authenticated', False):
             show_auth_page()
         else:
-            try:
-                global client
-                client = OpenAI(api_key=st.session_state.api_key)
+            global client
+            client = OpenAI(api_key=st.session_state.api_key)
+            
+            if st.session_state.get('page', 'input') == 'input':
+                display_input_page()
+            else:
+                display_generation_page()
                 
-                if st.session_state.get('page', 'input') == 'input':
-                    display_input_page()
-                    show_history()
-                else:
-                    display_generation_page()
-            except Exception as e:
-                st.error(f"API შეცდომა: {str(e)}")
-                logout()
-                if st.button("🔄 ხელახლა შესვლა"):
-                    st.rerun()
-
-        # Footer
-        st.markdown(
-            """
-            <div style='text-align: center; color: rgba(255,255,255,0.5); 
-                 padding: 1rem 0; font-size: 0.8rem; margin-top: 2rem;'>
-            შექმნილია ❤️-ით DALL-E 3-ის გამოყენებით
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
     except Exception as e:
         show_error_message(e)
+        if "API" in str(e):
+            st.session_state.authenticated = False
+            st.rerun()
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        st.error(f"კრიტიკული შეცდომა: {str(e)}")
-        if st.button("🔄 გვერდის განახლება", key="refresh_button"):
-            st.rerun()
+        show_error_message(e)
