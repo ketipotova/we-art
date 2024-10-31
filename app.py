@@ -26,6 +26,22 @@ def init_db():
     conn.commit()
     conn.close()
 
+
+# Initialize session state
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+if 'api_key' not in st.session_state:
+    st.session_state.api_key = None
+if 'page' not in st.session_state:
+    st.session_state.page = 'auth'
+if 'user_data' not in st.session_state:
+    st.session_state.user_data = {}
+if 'history' not in st.session_state:
+    st.session_state.history = []
+if 'username' not in st.session_state:
+    st.session_state.username = None
+
+
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -530,6 +546,7 @@ def show_auth_page():
                 if api_key:
                     st.session_state.authenticated = True
                     st.session_state.api_key = api_key
+                    st.session_state.username = login_username
                     st.session_state.page = 'input'
                     st.success("წარმატებით შეხვედით სისტემაში!")
                     st.rerun()
@@ -628,19 +645,24 @@ def main():
             '<div class="header" style="padding: 1rem 0;">',
             unsafe_allow_html=True
         )
+        
         # Title and subtitle
-        st.title("🎨 AI სურათების გენერატორი")
-        st.markdown("### შექმენი შენი უნიკალური სურათი")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Add logout button in the sidebar if authenticated
+        col1, col2 = st.columns([6, 1])
+        with col1:
+            st.title("🎨 AI სურათების გენერატორი")
+            st.markdown("### შექმენი შენი უნიკალური სურათი")
+        
+        # Show user info and logout button if authenticated
         if st.session_state.authenticated:
-            with st.sidebar:
-                if st.button("გასვლა"):
-                    st.session_state.authenticated = False
-                    st.session_state.api_key = None
-                    st.session_state.page = 'auth'
+            with col2:
+                st.markdown(f"**👤 {st.session_state.username}**")
+                if st.button("🚪 გასვლა"):
+                    # Clear all session state
+                    for key in list(st.session_state.keys()):
+                        del st.session_state[key]
                     st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 
         # Display appropriate page based on state
         if not st.session_state.authenticated:
@@ -659,9 +681,8 @@ def main():
             except Exception as e:
                 st.error(f"API შეცდომა: {str(e)}")
                 # Reset authentication on API error
-                st.session_state.authenticated = False
-                st.session_state.api_key = None
-                st.session_state.page = 'auth'
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
                 if st.button("🔄 ხელახლა შესვლა"):
                     st.rerun()
 
@@ -678,12 +699,3 @@ def main():
 
     except Exception as e:
         show_error_message(e)
-
-# 11. Main Execution
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        st.error(f"კრიტიკული შეცდომა: {str(e)}")
-        if st.button("🔄 გვერდის განახლება"):
-            st.rerun()
