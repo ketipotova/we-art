@@ -411,4 +411,152 @@ def show_auth_page():
     with tab1:
         with st.form("login_form"):
             login_username = st.text_input("მომხმარებელი")
-            login_password = st.text_input("პა
+            login_password = st.text_input("პაროლი", type="password")
+            login_submitted = st.form_submit_button("შესვლა")
+            
+            if login_submitted:
+                api_key = verify_user(login_username, login_password)
+                if api_key:
+                    st.session_state.authenticated = True
+                    st.session_state.api_key = api_key
+                    st.session_state.page = 'input'
+                    st.success("წარმატებით შეხვედით სისტემაში!")
+                    st.rerun()
+                else:
+                    st.error("არასწორი მომხმარებელი ან პაროლი")
+
+    with tab2:
+        with st.form("register_form"):
+            new_username = st.text_input("მომხმარებელი")
+            new_password = st.text_input("პაროლი", type="password")
+            confirm_password = st.text_input("გაიმეორეთ პაროლი", type="password")
+            api_key = st.text_input("OpenAI API გასაღები", type="password")
+            register_submitted = st.form_submit_button("რეგისტრაცია")
+            
+            if register_submitted:
+                if new_password != confirm_password:
+                    st.error("პაროლები არ ემთხვევა")
+                elif len(new_password) < 6:
+                    st.error("პაროლი უნდა შეიცავდეს მინიმუმ 6 სიმბოლოს")
+                elif not api_key.startswith('sk-'):
+                    st.error("არასწორი API გასაღები")
+                else:
+                    if create_user(new_username, new_password, api_key):
+                        st.success("რეგისტრაცია წარმატებით დასრულდა! გთხოვთ შეხვიდეთ სისტემაში.")
+                    else:
+                        st.error("მომხმარებელი უკვე არსებობს")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def display_generation_page():
+    """Display the image generation and result page"""
+    st.markdown('<div class="generation-container">', unsafe_allow_html=True)
+
+    with st.spinner("🎨 ვქმნით შენთვის უნიკალურ სურათს..."):
+        progress_bar = st.progress(0)
+        for i in range(100):
+            time.sleep(0.01)
+            progress_bar.progress(i + 1)
+
+        english_prompt, georgian_summary = create_personalized_prompt(st.session_state.user_data)
+        if english_prompt and georgian_summary:
+            st.markdown("#### 🔮 სურათის დეტალები:")
+            st.markdown(georgian_summary)
+
+            with st.expander("🔍 სრული აღწერა"):
+                st.markdown(f"*{english_prompt}*")
+
+            image_url = generate_dalle_image(english_prompt)
+            if image_url:
+                add_to_history(image_url, english_prompt)
+
+                st.success("✨ თქვენი სურათი მზადაა!")
+                st.image(image_url, caption="შენი პერსონალური AI სურათი", use_column_width=True)
+
+                qr_col1, qr_col2 = st.columns([1, 2])
+                with qr_col1:
+                    st.markdown('<div class="qr-container">', unsafe_allow_html=True)
+                    qr_code = create_qr_code(image_url)
+                    if qr_code:
+                        st.image(qr_code, width=200)
+                        st.markdown("📱 დაასკანერე QR კოდი")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                with qr_col2:
+                    st.markdown('<div class="instructions-container">', unsafe_allow_html=True)
+                    st.markdown("""
+                        ### 📱 როგორ გადმოვწერო:
+                        1. გახსენი ტელეფონის კამერა
+                        2. დაასკანერე QR კოდი
+                        3. გადმოწერე სურათი
+                    """)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                # Download and new image buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(
+                        f'<a href="{image_url}" download="ai_image.png" '
+                        f'target="_blank"><button style="width:100%">📥 გადმოწერა</button></a>',
+                        unsafe_allow_html=True
+                    )
+                with col2:
+                    if st.button("🔄 ახალი სურათი"):
+                        st.session_state.page = 'input'
+                        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def main():
+    """Main application function"""
+    try:
+        # Display header with minimal padding
+        st.markdown(
+            '<div class="header" style="padding: 1rem 0;">',
+            unsafe_allow_html=True
+        )
+        # Title and subtitle
+        st.title("🎨 AI სურათების გენერატორი")
+        st.markdown("### შექმენი შენი უნიკალური სურათი")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Add logout button in the sidebar if authenticated
+        if st.session_state.authenticated:
+            with st.sidebar:
+                if st.button("გასვლა"):
+                    st.session_state.authenticated = False
+                    st.session_state.api_key = None
+                    st.session_state.page = 'auth'
+                    st.rerun()
+
+        # Display appropriate page based on state
+        if not st.session_state.authenticated:
+            show_auth_page()
+        else:
+            # Initialize OpenAI client with the stored API key
+            global client
+            client = OpenAI(api_key=st.session_state.api_key)
+            
+            if st.session_state.page == 'input':
+                display_input_page()
+                show_history()
+            else:
+                display_generation_page()
+
+        # Add minimal footer
+        st.markdown(
+            """
+            <div style='text-align: center; color: rgba(255,255,255,0.5); 
+                 padding: 1rem 0; font-size: 0.8rem; margin-top: 2rem;'>
+            შექმნილია ❤️-ით DALL-E 3-ის გამოყენებით
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    except Exception as e:
+        show_error_message(e)
+
+# Main execution
+if __name__ == "__main__":
+    main()
