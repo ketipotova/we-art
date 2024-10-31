@@ -111,6 +111,15 @@ st.markdown("""
         margin: 0 auto !important;
     }
 
+    /* Hide all empty containers */
+    .stContainer:empty,
+    .block-container:empty,
+    .input-container:empty,
+    .generation-container:empty,
+    .feature-container:empty {
+        display: none;
+    }
+
     /* Base theme */
     .stApp {
         background: linear-gradient(150deg, #1a1a2e 0%, #16213e 100%);
@@ -241,6 +250,7 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # Data structures
 hobbies = {
