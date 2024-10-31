@@ -96,9 +96,7 @@ if 'username' not in st.session_state:
 # Global client variable
 client = None
 
-# Custom styling
-st.markdown("""
-    <style>
+<style>
     /* Hide Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -109,6 +107,11 @@ st.markdown("""
         max-width: 1000px !important;
         padding: 0 !important;
         margin: 0 auto !important;
+    }
+
+    /* Hide empty feature containers */
+    .feature-container:empty {
+        display: none;
     }
 
     /* Base theme */
@@ -239,8 +242,8 @@ st.markdown("""
         border-radius: 15px;
         margin: 1rem auto;
     }
-    </style>
-""", unsafe_allow_html=True)
+</style>
+
 
 # Data structures
 hobbies = {
