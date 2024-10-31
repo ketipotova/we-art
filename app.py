@@ -696,7 +696,6 @@ def display_generation_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-# Update the authenticated user display in main()
 def show_user_header():
     """Display user header with logout button"""
     if st.session_state.get('authenticated', False):
@@ -708,6 +707,7 @@ def show_user_header():
             st.markdown(
                 f'<div class="user-info"><span>👤 {st.session_state.username}</span></div>',
                 unsafe_allow_html=True
+            )
 
 def main():
     """Main application function"""
