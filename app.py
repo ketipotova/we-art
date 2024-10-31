@@ -96,7 +96,8 @@ if 'username' not in st.session_state:
 # Global client variable
 client = None
 
-<style>
+st.markdown("""
+    <style>
     /* Hide Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -243,6 +244,8 @@ client = None
         margin: 1rem auto;
     }
 </style>
+""", unsafe_allow_html=True)
+
 
 
 # Data structures
