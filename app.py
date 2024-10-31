@@ -401,6 +401,37 @@ def add_to_history(image_url, prompt):
         'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
     })
 
+
+
+def show_error_message(error):
+    """Display error message with retry option"""
+    st.error(f"შეცდომა: {str(error)}")
+    if st.button("🔄 ხელახლა ცდა"):
+        st.rerun()
+
+def validate_inputs(user_data):
+    """Validate user inputs before processing"""
+    if not user_data.get('name'):
+        return False, "გთხოვთ შეიყვანოთ სახელი"
+    if not user_data.get('hobby'):
+        return False, "გთხოვთ აირჩიოთ ჰობი"
+    return True, ""
+
+def show_history():
+    """Display history of generated images"""
+    if st.session_state.history:
+        with st.expander("🕒 წინა სურათები"):
+            for item in reversed(st.session_state.history):
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.image(item['url'], width=200)
+                with col2:
+                    st.markdown(f"**დრო:** {item['timestamp']}")
+                    st.markdown(f"**აღწერა:** {item['prompt'][:100]}...")
+                st.markdown("---")
+
+
+
 def show_auth_page():
     """Display authentication page"""
     st.markdown('<div class="auth-container">', unsafe_allow_html=True)
@@ -507,6 +538,8 @@ def display_generation_page():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+client = None  # Add this before main()
+
 def main():
     """Main application function"""
     try:
@@ -533,15 +566,24 @@ def main():
         if not st.session_state.authenticated:
             show_auth_page()
         else:
-            # Initialize OpenAI client with the stored API key
-            global client
-            client = OpenAI(api_key=st.session_state.api_key)
-            
-            if st.session_state.page == 'input':
-                display_input_page()
-                show_history()
-            else:
-                display_generation_page()
+            try:
+                # Initialize OpenAI client with the stored API key
+                global client
+                client = OpenAI(api_key=st.session_state.api_key)
+                
+                if st.session_state.page == 'input':
+                    display_input_page()
+                    show_history()
+                else:
+                    display_generation_page()
+            except Exception as e:
+                st.error(f"API შეცდომა: {str(e)}")
+                # Reset authentication on API error
+                st.session_state.authenticated = False
+                st.session_state.api_key = None
+                st.session_state.page = 'auth'
+                if st.button("🔄 ხელახლა შესვლა"):
+                    st.rerun()
 
         # Add minimal footer
         st.markdown(
@@ -557,6 +599,11 @@ def main():
     except Exception as e:
         show_error_message(e)
 
-# Main execution
+# 11. Main Execution
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        st.error(f"კრიტიკული შეცდომა: {str(e)}")
+        if st.button("🔄 გვერდის განახლება"):
+            st.rerun()
